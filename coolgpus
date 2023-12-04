@@ -23,6 +23,7 @@ parser.add_argument('--hyst', nargs='?', default=2, type=float, help='The hyster
 parser.add_argument('--kill', action='store_true', default=False, help='Whether to kill existing Xorg sessions')
 parser.add_argument('--verbose', action='store_true', default=False, help='Whether to print extra debugging information')
 parser.add_argument('--debug', action='store_true', default=False, help='Whether to only start the Xorg subprocesses, and not actually alter the fan speed. This can be useful for debugging.')
+parser.add_argument('--excl-gpus', nargs='+', default=[], type=str, help='BUS IDs of GPUs to exclude from control')
 args = parser.parse_args()
 
 T_HYST =  args.hyst
@@ -107,8 +108,8 @@ def decimalize(bus):
     decimal"""
     return ':'.join([str(int('0x' + p, 16)) for p in re.split('[:.]', bus[9:])])
 
-def gpu_buses():
-    return log_output(['nvidia-smi', '--format=csv,noheader', '--query-gpu=pci.bus_id']).splitlines()
+def gpu_buses(excl_gpus=[]):
+    return [busid for busid in log_output(['nvidia-smi', '--format=csv,noheader', '--query-gpu=pci.bus_id']).splitlines() if busid not in excl_gpus]
 
 def query(bus, field):
     [line] = log_output(['nvidia-smi', '--format=csv,noheader', '--query-gpu='+field, '-i', bus]).splitlines()
@@ -255,7 +256,7 @@ def debug_loop(displays):
 
 
 def run():
-    buses = gpu_buses() 
+    buses = gpu_buses(args.excl_gpus)
     with xservers(buses) as displays:
         if args.debug:
             debug_loop(displays)
